@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<robot name="robot_description" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Include reusable macros -->
+  <xacro:include filename="macros.xacro"/>
+
+  <!-- Path to the meshes folder, used by lidar and camera visuals -->
+  <xacro:arg name="mesh_path" default="../meshes/"/>
+
+  <!-- Chassis dimensions and mass -->
+  <xacro:property name="base_length" value="0.50"/>
+  <xacro:property name="base_width"  value="0.35"/>
+  <xacro:property name="base_height" value="0.15"/>
+  <xacro:property name="base_mass"   value="8.0"/>
+
+  <!-- Wheel dimensions and mass -->
+  <xacro:property name="wheel_radius" value="0.075"/>
+  <xacro:property name="wheel_width"  value="0.04"/>
+  <xacro:property name="wheel_mass"   value="0.5"/>
+
+  <!-- Caster wheel dimensions and mass -->
+  <xacro:property name="caster_radius" value="0.03"/>
+  <xacro:property name="caster_mass"   value="0.2"/>
+
+  <!-- Gap between chassis bottom and wheel center, so the chassis sits clearly above the wheels -->
+  <xacro:property name="ground_clearance" value="0.04"/>
+
+  <!-- Height of base_link center above the ground -->
+  <xacro:property name="chassis_z" value="${wheel_radius + ground_clearance}"/>
+
+  <!-- Offset to keep the drive wheels touching the ground even though the chassis is raised -->
+  <xacro:property name="wheel_z_offset" value="${wheel_radius - chassis_z}"/>
+
+  <!-- Offset to keep the caster wheel touching the ground, same logic as the drive wheels -->
+  <xacro:property name="caster_z_offset" value="${caster_radius - chassis_z}"/>
+
+  <!-- Small correction for the mesh's internal offset, computed from the STL bounding box -->
+  <xacro:property name="lidar_visual_xyz"  value="0.01337 -0.00041 0.00533"/>
+  <xacro:property name="lidar_visual_rpy"  value="0 0 0"/>
+  <xacro:property name="camera_visual_xyz" value="0.000352 0 0"/>
+  <xacro:property name="camera_visual_rpy" value="0 0 0"/>
+
+  <!-- Materials -->
+  <material name="dark_blue">
+    <color rgba="0.1 0.1 0.4 1.0"/>
+  </material>
+  <material name="black">
+    <color rgba="0.05 0.05 0.05 1.0"/>
+  </material>
+  <material name="lidar_gray">
+    <color rgba="0.6 0.6 0.6 1.0"/>
+  </material>
+  <material name="camera_black">
+    <color rgba="0.5 0.5 0.5 1.0"/>
+  </material>
+
+  <!-- Virtual root link, no geometry -->
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${chassis_z}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Chassis -->
+  <xacro:box_link
+    name="base_link"
+    length="${base_length}"
+    width="${base_width}"
+    height="${base_height}"
+    mass="${base_mass}"
+    material="dark_blue"/>
+
+  <!-- Drive wheels: reflect = +1 is left (+Y), reflect = -1 is right (-Y) -->
+  <xacro:wheel prefix="left"  reflect="1"/>
+  <xacro:wheel prefix="right" reflect="-1"/>
+
+  <!-- Caster wheel, fixed, opposite side from lidar/camera -->
+  <link name="caster_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="${caster_radius}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <sphere radius="${caster_radius}"/>
+      </geometry>
+    </collision>
+    <xacro:inertial_sphere mass="${caster_mass}" r="${caster_radius}">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:inertial_sphere>
+  </link>
+
+  <joint name="caster_wheel_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="caster_wheel"/>
+    <origin xyz="${(base_length/2 - 0.05)} 0 ${caster_z_offset}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- LiDAR link, uses custom mesh lidar.STL -->
+  <link name="lidar_link">
+    <visual>
+      <origin xyz="${lidar_visual_xyz}" rpy="${lidar_visual_rpy}"/>
+      <geometry>
+        <mesh filename="$(arg mesh_path)lidar.STL" />
+      </geometry>
+      <material name="lidar_gray"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.06" length="0.04"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0001" ixy="0.0" ixz="0.0"
+               iyy="0.0001" iyz="0.0"
+               izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0.2 0 0.087" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera link, uses custom mesh camera.STL -->
+  <link name="camera_link">
+    <visual>
+      <origin xyz="${camera_visual_xyz}" rpy="${camera_visual_rpy}"/>
+      <geometry>
+        <mesh filename="$(arg mesh_path)camera.STL" scale="0.5 0.5 0.5"/>
+      </geometry>
+      <material name="camera_black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.08 0.03 0.03"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00005" ixy="0.0" ixz="0.0"
+               iyy="0.00005" iyz="0.0"
+               izz="0.00005"/>
+    </inertial>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.25880 0 0.070" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Optical frame for the camera, follows REP-103 convention (Z forward, X right, Y down) -->
+  <link name="camera_optical_link"/>
+
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_link"/>
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
+</robot>
